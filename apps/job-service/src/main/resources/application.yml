@@ -1,0 +1,52 @@
+# job-service — 포트 고정표: 8084
+server:
+  port: 8084
+
+spring:
+  profiles:
+    active: dev, micro
+  application:
+    name: job-service
+  config:
+    # config-server 연동 — optional: 미가동 시에도 단독 기동 가능. 컨테이너에서는 CONFIG_SERVER_URI로 재지정
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+
+  # 접속정보(url/username/password)는 config-server(config-repo/application.yml)가 SSOT다 —
+  # optional import라도 정상 배선에서는 항상 원격 값이 우선하므로 여기서는 두지 않는다.
+  datasource:
+    hikari:
+      # JdbcClient SQL에 스키마명을 하드코딩하지 않는다 — 커넥션 초기화 시 search_path로 결정.
+      # setSchema()(=hikari.schema)는 경로를 통째로 대체해 ext(확장) 스키마가 사라지므로 쓰지 않는다.
+      # Quartz/Batch는 이 경로가 아니라 각자 tablePrefix의 스키마 수식으로 quartz/batch 스키마에 접근한다
+      connection-init-sql: SET search_path TO job, public, ext
+  flyway:
+    # 스키마 소유권 규약의 첫 확장 사례: job-service가 프레임워크 메타 스키마(quartz/batch)까지 3개를 소유
+    # history 테이블은 default-schema(job)에 남는다
+    schemas: job,batch,quartz
+    default-schema: job
+  kafka:
+    bootstrap-servers: localhost:9092 # 브로커 포트는 전 환경 9092 — 컨테이너 간은 kafka:9092 (docker 프로파일에서 재정의)
+
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: never # DDL은 Flyway V1 단독 소유
+    # JDBC store에 남은 구 트리거(cron)를 기동 시 코드 정의로 갱신
+    overwrite-existing-jobs: true
+    properties:
+      org.quartz.jobStore.driverDelegateClass: org.quartz.impl.jdbcjobstore.PostgreSQLDelegate
+      org.quartz.jobStore.tablePrefix: quartz.QRTZ_ # 스키마 수식 접두 — search_path(job)를 넘는 경로
+      org.quartz.jobStore.isClustered: false
+
+  batch:
+    job:
+      enabled: false # 기동 시 Batch Job 자동 실행 금지 — 실행은 SampleJobLauncher 경유만 (자동/수동 동일 경로)
+    jdbc:
+      initialize-schema: never # DDL은 Flyway V2 단독 소유
+      table-prefix: batch.BATCH_ # 시퀀스 incrementer도 이 접두를 탄다 (V2 헤더 참조)
+
+# 샘플 Job 스케줄 — 테스트가 재정의한다 (통합 테스트 기본값은 발화하지 않는 2099년 cron)
+swtp:
+  sample-job:
+    collect-cron: "0 * * * * ?"        # 매분 — 아키텍처 8.3 "1분 데이터 수집"
+    aggregate-cron: "0 */10 * * * ?"   # 10분 — 아키텍처 8.4 "10분 집계"

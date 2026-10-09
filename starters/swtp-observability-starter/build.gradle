@@ -1,0 +1,12 @@
+// 관측성 공통 규약 스타터 — prometheus 메트릭 노출 + 공통 태그 기본값 제공
+plugins {
+    id 'swtp.spring-library'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot'
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+
+    // /actuator/prometheus 노출용 레지스트리 — 앱은 이 스타터만 추가하면 scrape 대상이 된다
+    api 'io.micrometer:micrometer-registry-prometheus'
+}

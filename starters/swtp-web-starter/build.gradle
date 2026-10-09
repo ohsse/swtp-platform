@@ -1,0 +1,20 @@
+// 웹 계층 공통 규약 스타터 — ErrorCode/GlobalExceptionHandler/공통 OpenAPI (Phase 6 실구현)
+plugins {
+    id 'swtp.spring-library'
+}
+
+dependencies {
+    api project(':libs:swtp-common')
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    // p6spy는 swtp-persistence-starter 소속 — DB 미사용 앱(gateway/realtime 등)에 딸려가면 안 된다
+
+    // 예외 핸들러 컴파일용 — 웹 스택 자체는 소비 앱이 직접 의존한다 (스타터가 강제 전파하지 않음)
+    compileOnly 'org.springframework.boot:spring-boot-starter-webmvc'
+    compileOnly 'org.springframework.boot:spring-boot-starter-validation'
+
+    // OpenAPI 명세(swagger-ui) — API를 노출하는 앱은 web-starter를 통해 제공받는다
+    api libs.springdoc.openapi.starter.webmvc.ui
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation'
+}

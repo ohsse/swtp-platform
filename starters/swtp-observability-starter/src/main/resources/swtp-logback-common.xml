@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  콘솔 포맷과 무관한 공통 부분 — swtp-logback-plain.xml / swtp-logback-ecs.xml이 함께 include한다.
+
+  이 파일은 CONSOLE appender를 정의하지 않는다. 포맷별 진입점이 Boot 조각
+  (console-appender.xml / structured-console-appender.xml) 중 하나를 먼저 include하고,
+  두 조각 모두 appender 이름이 CONSOLE이라 아래 <root>가 그대로 참조할 수 있다.
+  따라서 include 순서가 곧 의존 순서다 — defaults.xml → CONSOLE appender → 이 파일.
+
+  FILE / ERROR_FILE은 어느 포맷에서든 평문이다. 사람이 직접 열어 보는 감사·장애분석용 백업이며
+  수집기는 이 디렉토리를 읽지 않는다(이중 적재 방지) — 수집 경로는 stdout 단독이다.
+-->
+<included>
+    <!--
+      springProperty의 defaultValue만 믿지 않는다 — 프로퍼티 미설정 시 변수 자체가 정의되지 않아
+      "..._IS_UNDEFINED"가 그대로 흘러들어 rollingPolicy가 기동에 실패한다.
+      사용처에 logback의 :- fallback을 함께 붙인다 (Boot 제공 조각들과 동일한 관례).
+    -->
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name"/>
+    <springProperty scope="context" name="LOG_PATH" source="swtp.logging.path"/>
+    <springProperty scope="context" name="LOG_MAX_FILE_SIZE" source="swtp.logging.max-file-size"/>
+    <springProperty scope="context" name="LOG_MAX_HISTORY" source="swtp.logging.max-history"/>
+    <springProperty scope="context" name="LOG_TOTAL_SIZE_CAP" source="swtp.logging.total-size-cap"/>
+
+    <property name="SWTP_APP" value="${APP_NAME:-swtp}"/>
+    <property name="LOG_DIR" value="${LOG_PATH:-logs}/${SWTP_APP}"/>
+    <property name="SWTP_MAX_FILE_SIZE" value="${LOG_MAX_FILE_SIZE:-100MB}"/>
+    <property name="SWTP_MAX_HISTORY" value="${LOG_MAX_HISTORY:-30}"/>
+    <property name="SWTP_TOTAL_SIZE_CAP" value="${LOG_TOTAL_SIZE_CAP:-3GB}"/>
+
+    <!-- 일반 로그 파일 — 전체 레벨. 사람이 직접 열어 보는 용도라 평문 패턴을 유지한다 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/${SWTP_APP}.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>${FILE_LOG_CHARSET}</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/${SWTP_APP}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>${SWTP_MAX_FILE_SIZE}</maxFileSize>
+            <maxHistory>${SWTP_MAX_HISTORY}</maxHistory>
+            <totalSizeCap>${SWTP_TOTAL_SIZE_CAP}</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 에러 전용 파일 — 장애 시 이 파일만 보면 되도록 ERROR 이상만 남긴다 -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>ERROR</level>
+        </filter>
+        <file>${LOG_DIR}/${SWTP_APP}-error.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>${FILE_LOG_CHARSET}</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/${SWTP_APP}-error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>${SWTP_MAX_FILE_SIZE}</maxFileSize>
+            <maxHistory>${SWTP_MAX_HISTORY}</maxHistory>
+            <totalSizeCap>${SWTP_TOTAL_SIZE_CAP}</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 레벨은 Boot가 logging.level.* 프로퍼티로 초기화 후 덮어쓴다 (여기 값은 기동 초기 기본값) -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+</included>

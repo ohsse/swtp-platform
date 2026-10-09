@@ -1,0 +1,37 @@
+pluginManagement {
+    includeBuild 'build-logic'
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'swtp-platform'
+
+// 모듈 목록 — 각 Phase에서 순서대로 추가한다
+// Phase 2: libs/*, starters/*
+include 'libs:swtp-common'
+include 'starters:swtp-web-starter'
+include 'starters:swtp-kafka-starter'
+include 'starters:swtp-observability-starter'
+include 'starters:swtp-security-starter'
+include 'starters:swtp-persistence-starter'
+
+// Phase 3: apps/*
+include 'apps:config-server'
+include 'apps:discovery-server'
+include 'apps:gateway'
+include 'apps:master-service'
+include 'apps:telemetry-service'
+include 'apps:realtime-service'
+include 'apps:job-service'
+include 'apps:auth-service'
+include 'apps:autonomous-service'
+include 'apps:ems-service'
+include 'apps:pms-service'

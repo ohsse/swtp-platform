@@ -1,0 +1,21 @@
+// 영속성 공통 규약 스타터 — JDBC/Flyway/p6spy/JPA Auditing (Phase 9 실구현)
+// JPA는 강제 전파하지 않는다 — master는 data-jpa, telemetry/job은 JdbcClient를 쓴다 (스키마별 소유권 원칙).
+plugins {
+    id 'swtp.spring-library'
+}
+
+dependencies {
+    // 감사 주체 SPI(AuditorProvider) — 보안 스타터와의 경계 인터페이스
+    api project(':libs:swtp-common')
+    // 공통 분모 — JDBC 커넥션/풀은 전 영속성 앱이 필요로 한다
+    api 'org.springframework.boot:spring-boot-starter-jdbc'
+    api 'org.springframework.boot:spring-boot-starter-flyway'
+    // driver-class-name(config-repo SSOT)이 p6spy 클래스를 직접 참조하므로 런타임 필수 — api로 전파
+    api libs.p6spy
+    runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // BaseEntity(JPA Auditing) 컴파일용만 — JPA 스택 자체는 소비 앱이 직접 의존해야 활성화된다
+    compileOnly 'org.springframework.boot:spring-boot-starter-data-jpa'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+}

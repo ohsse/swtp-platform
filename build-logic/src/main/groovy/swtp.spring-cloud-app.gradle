@@ -1,0 +1,28 @@
+// Spring Cloud 구성요소(config/eureka/gateway 등)를 쓰는 앱 규약
+
+plugins {
+    id 'swtp.spring-boot-app'
+}
+
+def libs = extensions.getByType(VersionCatalogsExtension).named('libs')
+
+dependencies {
+    implementation platform(libs.findLibrary('spring-cloud-dependencies').get())
+    // 설정 전파(Config Bus) — /actuator/busrefresh는 발행자와 수신자 양쪽에 의존이 있어야 성립한다.
+    // 발행자(config-server)에만 넣으면 나머지 앱은 이벤트를 구독하지 않아 조용히 리프레시에서 빠진다.
+    // 실제로 앱별 선언 시절 11개 중 2개에만 들어가 있었다 — 그래서 규약으로 못박는다.
+    implementation 'org.springframework.cloud:spring-cloud-starter-bus-kafka'
+}
+
+// 테스트 컨텍스트는 레지스트리에 등록하지 않는다.
+// 켜두면 매 테스트가 기동 시 Eureka 등록을 시도하고, 서버가 없으니 재시도 백오프만큼 느려진다
+// (그리고 CI 환경에 discovery-server가 떠 있으면 유령 인스턴스가 레지스트리에 남는다).
+// 앱마다 @SpringBootTest properties에 적으면 새 테스트가 생길 때마다 빠뜨리므로 규약으로 못박는다.
+tasks.withType(Test).configureEach {
+    systemProperty 'eureka.client.enabled', 'false'
+    // 테스트 컨텍스트는 설정 전파에 참여하지 않는다 — eureka와 같은 이유다.
+    // 켜두면 Kafka Testcontainer가 없는 앱(gateway·auth·ems·pms·autonomous·discovery-server)의
+    // 테스트가 브로커 연결 재시도만큼 느려지고, 브로커가 떠 있으면 테스트 컨텍스트가
+    // 운영 토픽의 리프레시 이벤트를 받는다.
+    systemProperty 'spring.cloud.bus.enabled', 'false'
+}

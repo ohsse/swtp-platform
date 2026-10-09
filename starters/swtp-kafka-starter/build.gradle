@@ -1,0 +1,12 @@
+// Kafka 공통 규약 스타터 — Producer 직렬화 기본값 + 이벤트 봉투/퍼블리셔 + Consumer 규약(문자열 수신 + 봉투 파서)
+plugins {
+    id 'swtp.spring-library'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-autoconfigure'
+    // Boot 4 신설 스타터 — spring-kafka + Boot Kafka 자동구성을 소비 앱에 전파한다
+    api 'org.springframework.boot:spring-boot-starter-kafka'
+    // spring-kafka는 Jackson을 optional로 둔다 — 직렬화 기본값(JacksonJsonSerializer)과 봉투 파서가 요구하므로 명시 전파
+    api 'tools.jackson.core:jackson-databind'
+}

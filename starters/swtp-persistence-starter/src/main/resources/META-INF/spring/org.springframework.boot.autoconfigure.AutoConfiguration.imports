@@ -1,0 +1,2 @@
+com.mo.swtp.starter.persistence.SwtpPersistenceAutoConfiguration
+com.mo.swtp.starter.persistence.SwtpJpaAuditingAutoConfiguration

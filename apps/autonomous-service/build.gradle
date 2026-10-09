@@ -1,0 +1,15 @@
+// 자율운영 서비스 — AI 연계 운영 판단/제어 (Optional 배포 대상)
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation project(':starters:swtp-web-starter')
+    implementation project(':starters:swtp-observability-starter')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시에도 기동 가능)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    // 서비스 레지스트리 등록 — 게이트웨이가 lb://로 이 서비스를 찾는다.
+    // 레지스트리가 없어도 재시도만 할 뿐 기동은 막지 않는다 (config-server와 같은 optional 성격)
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+}

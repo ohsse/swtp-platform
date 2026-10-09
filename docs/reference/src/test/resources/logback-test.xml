@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  테스트 전용 로깅 설정.
+  Spring Boot/Logback 은 logback-test.xml 을 가장 먼저 탐색하므로,
+  -Pprofile=dev 빌드로 dev 용 logback-spring.xml(파일 경로 D:/inp_simulator/logs)이
+  메인 리소스에 병합되더라도 테스트 실행 시에는 이 설정이 우선 적용된다.
+  테스트는 서버 로그 디렉터리에 의존하지 않도록 콘솔 출력만 사용한다.
+-->
+<configuration>
+
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <!-- 콘솔 어펜더(파일 어펜더 없음 → 쓰기 가능한 경로 불필요) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

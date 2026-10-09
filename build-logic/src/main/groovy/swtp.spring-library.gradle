@@ -1,0 +1,26 @@
+// libs/, starters/ 공유 라이브러리 규약
+// Boot 플러그인은 적용하지 않고 BOM(platform)으로 버전만 정렬한다
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
+
+plugins {
+    id 'swtp.java-common'
+    id 'java-library'
+}
+
+dependencies {
+    api platform(SpringBootPlugin.BOM_COORDINATES)
+    annotationProcessor platform(SpringBootPlugin.BOM_COORDINATES)
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Gradle 9는 JUnit Platform launcher를 자동 주입하지 않으므로 명시 필요
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// testFixtures 소스셋은 main/test와 별도 configuration을 쓰므로 BOM이 상속되지 않는다 —
+// 픽스처에서도 버전 없는 의존 선언이 가능하도록 여기서 한 번 더 정렬한다.
+plugins.withId('java-test-fixtures') {
+    dependencies {
+        testFixturesApi platform(SpringBootPlugin.BOM_COORDINATES)
+    }
+}

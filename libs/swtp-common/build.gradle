@@ -1,0 +1,4 @@
+// 모든 모듈이 공유하는 순수 공통 라이브러리 (프레임워크 의존 최소화)
+plugins {
+    id 'swtp.spring-library'
+}

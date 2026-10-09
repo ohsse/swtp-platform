@@ -1,0 +1,4 @@
+# 직렬화·소비 기본값 주입 — 자동구성보다 이른 Environment 단계에서 동작한다
+# Boot 4 신 인터페이스 키 — 구 org.springframework.boot.env.* 키는 deprecated(removal) 하위호환 경로
+org.springframework.boot.EnvironmentPostProcessor=\
+com.mo.swtp.starter.kafka.SwtpKafkaEnvironmentPostProcessor

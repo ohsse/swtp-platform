@@ -1,0 +1,19 @@
+// 서비스 레지스트리(Eureka) — Core 배포 대상. 게이트웨이의 lb:// 라우팅이 여기서 대상을 찾는다
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-server'
+    implementation project(':starters:swtp-observability-starter')
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시에도 기동 가능)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+}
+
+// 규약(swtp.spring-cloud-app)은 테스트에서 Eureka 클라이언트를 끈다 — 등록 재시도로 느려지지 않게.
+// 그런데 Eureka '서버' 자동구성은 클라이언트 자동구성이 만드는 ApplicationInfoManager를 주입받으므로,
+// 여기서만 되돌리지 않으면 컨텍스트 로드 자체가 실패한다.
+// 네트워크 호출은 발생하지 않는다 — application.yml이 register-with-eureka/fetch-registry를 꺼 둔다.
+tasks.withType(Test).configureEach {
+    systemProperty 'eureka.client.enabled', 'true'
+}

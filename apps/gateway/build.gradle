@@ -1,0 +1,27 @@
+// API Gateway — 외부 진입점. Eureka 레지스트리 기반 lb:// 라우팅
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-gateway-server-webflux'
+    implementation project(':starters:swtp-observability-starter')
+    // 공통 헤더/클레임 규약(X-Request-Id, X-User-*, JWT 클레임) — web/security-starter는 SERVLET 전용이라 의존하지 않는다
+    implementation project(':libs:swtp-common')
+    // JWT 검증만 필요하다 — starter-security를 넣으면 반응형 시큐리티 자동구성이 켜져
+    // 기본 체인이 모든 요청에 인증을 요구하고 인증 판단 지점이 둘로 갈린다.
+    implementation 'org.springframework.security:spring-security-oauth2-jose'
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시 로컬 기본값 사용)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    // lb:// 라우팅의 대상 조회원. eureka-client가 spring-cloud-starter-loadbalancer를 함께 끌어오고,
+    // 게이트웨이는 그 중 반응형 구현(ReactiveLoadBalancer)을 쓴다.
+    // 서블릿 스택 배제: 게이트웨이는 WebFlux 앱이라 spring-boot-starter-web이 딸려 들어오면
+    // Boot가 웹 애플리케이션 타입을 SERVLET으로 판정해 게이트웨이 자동구성이 통째로 꺼진다.
+    implementation('org.springframework.cloud:spring-cloud-starter-netflix-eureka-client') {
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-web'
+        exclude group: 'org.springframework.boot', module: 'spring-boot-starter-webmvc'
+    }
+    // API 문서 집계 UI — 게이트웨이는 WebFlux이므로 webmvc-ui(web-starter 소속)가 아니라 webflux-ui다.
+    // 여기서만 swagger-ui를 호스팅하고 서비스별 스펙은 라우팅으로 끌어온다 (단일 진입점 원칙)
+    implementation libs.springdoc.openapi.starter.webflux.ui
+}

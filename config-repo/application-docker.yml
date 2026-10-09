@@ -1,0 +1,18 @@
+# docker 프로파일 공통 설정 — 컨테이너로 기동하는 전 서비스에 배포된다.
+# 환경 축인 이 파일에는 컨테이너 네트워크 기준 레지스트리/Kafka 접속 정보만 둔다.
+#
+# 인증 설정(swtp.auth)은 여기에 두지 않는다 — 환경 축인 이 파일은 host/port만 갖는다.
+# mode와 jwks-uri는 SWTP_AUTH_MODE / SWTP_AUTH_JWKS_URI 환경변수가 결정한다.
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/
+  instance:
+    # 컨테이너의 기본 hostname은 컨테이너 ID(무작위 16진수)라 다른 컨테이너에서 DNS로 풀리지 않는다.
+    # container_name은 hostname이 아니므로 대체재가 되지 못한다 — compose 네트워크 안에서
+    # 확실히 도달 가능한 값은 IP뿐이라 IP로 등록한다.
+    prefer-ip-address: true
+
+spring:
+  kafka:
+    bootstrap-servers: kafka:9092

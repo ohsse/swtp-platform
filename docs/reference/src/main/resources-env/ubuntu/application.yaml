@@ -1,0 +1,100 @@
+spring:
+  application:
+    name: editor
+
+  # ===== 파일 업로드 (multipart) =====
+  # INP 파일 업로드 크기 한도. 환경에 따라 환경변수로 오버라이드 가능합니다.
+  servlet:
+    multipart:
+      max-file-size: ${EDITOR_MULTIPART_MAX_FILE_SIZE:50MB}
+      max-request-size: ${EDITOR_MULTIPART_MAX_REQUEST_SIZE:50MB}
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+  # ===== 데이터베이스 (MariaDB) =====
+  # 기본값은 개발용 접속 정보이며, 운영 환경에서는 환경변수로 오버라이드합니다.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mariadb://localhost:3306/ems_db_gs_dump_260410}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.mariadb.jdbc.Driver
+
+  # ===== JPA / Hibernate =====
+  jpa:
+    open-in-view: false              # OSIV 비활성화 (지연 로딩 범위를 트랜잭션으로 한정)
+    hibernate:
+      ddl-auto: validate             # 스키마는 Flyway가 관리, JPA는 매핑 검증만 수행
+    show-sql: true                   # 개발 단계 SQL 로깅 (운영 시 false 권장)
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ===== Flyway (DB 스키마 버전 관리) =====
+  flyway:
+    enabled: false
+    baseline-on-migrate: false        # 기존 DB에 최초 적용 시 baseline 자동 생성
+    baseline-version: 0              # baseline 을 V0 으로 (기본 V1 이면 V1 이 건너뛰어져 V2 FK 가 errno 150 실패)
+    locations: classpath:db/migration
+
+# ===== 서블릿 인코딩 =====
+# 멀티파트 폼 필드(예: 한글 파일명 등) 요청 파라미터를 UTF-8 로 강제 디코딩한다.
+# ===== 애플리케이션 파일 저장소 =====
+# INP 원본/백업 파일 저장 기준 경로. 환경에 따라 변경 가능하며 환경변수로 오버라이드합니다.
+# (Windows 경로는 역슬래시 이스케이프 문제를 피하기 위해 슬래시 '/'로 표기 — Java가 동일하게 처리)
+editor:
+  storage:
+    base-path: ${EDITOR_STORAGE_BASE_PATH:/app/files}
+
+  # ===== 네트워크 상세조회 =====
+  # INP 좌표는 한국 투영좌표(미터)입니다. 정확한 EPSG는 파일/지자체마다 다를 수 있어 기본값을 비워둡니다.
+  # 실제 좌표계를 알면 환경변수로 지정하세요(예: EPSG:5186). 미지정 시 응답 meta.crs 는 UNKNOWN 으로 표기됩니다.
+  network:
+    coordinate-crs: ${EDITOR_NETWORK_COORDINATE_CRS:}
+
+  # ===== 관망해석 시뮬레이션 =====
+  # 분석시각 조회의 정수장 송수유량 태그번호. 지자체별로 다를 수 있어 환경변수로 오버라이드 가능합니다.
+  simulation:
+    out-flow-tag: ${EDITOR_SIMULATION_OUT_FLOW_TAG:701-367-FRI-4007}
+
+  # ===== CORS =====
+  # 프론트엔드(별도 오리진)에서의 브라우저 요청을 허용합니다. 기본은 전체 허용(*)이며,
+  # 운영 환경에서는 환경변수로 특정 오리진만 지정하는 것을 권장합니다(쉼표로 구분: http://a,http://b).
+  cors:
+    allowed-origins: ${EDITOR_CORS_ALLOWED_ORIGINS:*}
+
+  # ===== 파이썬 최적화 모듈 연동 (개발 tenant) =====
+  # 개발 tenant 파이썬 포트는 30092 입니다(로컬 기본 8090 을 오버라이드).
+  python:
+    base-url: ${EDITOR_PYTHON_BASE_URL:http://localhost:30092}
+    optimize-path: ${EDITOR_PYTHON_OPTIMIZE_PATH:/optimize}
+    connect-timeout-ms: ${EDITOR_PYTHON_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${EDITOR_PYTHON_READ_TIMEOUT_MS:5000}
+
+  # ===== 파이썬 데이터 조회/계산 모듈 연동 (두 번째 API) =====
+  # 두 번째 파이썬 포트는 30093 입니다. docker 환경에서는 EDITOR_PYTHON_DATA_BASE_URL 로 오버라이드합니다.
+  # 동기 호출로 계산 결과를 받아 사용하므로 읽기 타임아웃을 길게 둡니다.
+  python-data:
+    base-url: ${EDITOR_PYTHON_DATA_BASE_URL:http://localhost:30093}
+    connect-timeout-ms: ${EDITOR_PYTHON_DATA_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${EDITOR_PYTHON_DATA_READ_TIMEOUT_MS:30000}
+
+  # ===== Swagger "Servers" 목록 =====
+  # Swagger UI 의 "Try it out" 요청 대상 주소. 컨텍스트 경로(/api)까지 포함해야 paths(/inp-files/...)와 합쳐져
+  # 최종 호출 주소가 올바르게 만들어진다. proxy-url=nginx 경유(외부 접근), direct-url=백엔드 직접(점검용).
+  swagger:
+    proxy-url: ${EDITOR_SWAGGER_PROXY_URL:http://localhost:30090/api}
+    direct-url: ${EDITOR_SWAGGER_DIRECT_URL:http://localhost:30091/api}
+
+server:
+  port: 30091
+  # ===== 컨텍스트 경로 =====
+  # nginx 리버스 프록시가 /api 를 떼지 않고 그대로 백엔드로 전달하므로(proxy_pass 끝 슬래시 없음),
+  # 백엔드도 /api 하위에서 서빙되도록 컨텍스트 경로를 /api 로 맞춘다.
+  # 결과: API·Swagger 가 직접 접근(30091/api/...)과 프록시 접근(30090/api/...) 모두 동일 경로로 동작.
+  servlet:
+    context-path: /api
+  # 리버스 프록시(nginx) 뒤에서 X-Forwarded-* 헤더를 반영해 외부 요청 URL(scheme/host)을 복원한다.
+  # Swagger UI 의 "Servers"/Try it out 이 프록시 경유 시에도 올바른 주소를 생성하도록 한다.
+  forward-headers-strategy: framework

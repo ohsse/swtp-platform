@@ -1,0 +1,12 @@
+# autonomous-service — 포트 고정표: 8086
+server:
+  port: 8086
+
+spring:
+  profiles:
+    active: dev,profile
+  application:
+    name: autonomous-service
+  config:
+    # config-server 연동 — optional: 미가동 시에도 단독 기동 가능. 컨테이너에서는 CONFIG_SERVER_URI로 재지정
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"

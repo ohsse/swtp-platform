@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  콘솔 평문 — 기본 포맷. SwtpObservabilityEnvironmentPostProcessor가
+  logging.config = classpath:swtp-logback-${SWTP_LOG_FORMAT:plain}.xml 로 이 파일을 고른다.
+
+  대상: 로그 수집 파이프라인을 운용하지 않는 정수장, 그리고 로컬 개발.
+  수집하는 정수장은 배포 .env에 SWTP_LOG_FORMAT=ecs를 적어 swtp-logback-ecs.xml로 바꾼다.
+
+  로그 경로는 두 갈래이며 이 파일에서는 둘 다 평문이다:
+    · CONSOLE (평문) → 사람이 터미널·docker logs로 직접 읽는 용도
+    · FILE / ERROR_FILE (평문) → 감사·장애분석용 로컬 백업 (swtp-logback-common.xml)
+-->
+<configuration>
+    <!-- CONSOLE_LOG_*/FILE_LOG_* 프로퍼티와 conversionRule 정의 (Boot 제공) -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 평문 콘솔 appender (Boot 제공 조각 재사용) — 포맷은 CONSOLE_LOG_PATTERN -->
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- 파일 appender와 root — 포맷과 무관한 공통부 -->
+    <include resource="swtp-logback-common.xml"/>
+</configuration>

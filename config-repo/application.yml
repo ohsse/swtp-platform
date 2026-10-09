@@ -1,0 +1,91 @@
+# 전 서비스 공통 설정 배포 지점 — Config Server(native)가 이 디렉토리를 서빙한다.
+# 서비스별 설정은 <spring.application.name>.yml 파일로 추가한다. (예: master-service.yml)
+# Phase 5 컨테이너 통합 시 환경별 재정의(프로파일)를 여기에 배치한다.
+swtp:
+  auth:
+    # 인증 검증 모드 — 이 한 값이 게이트웨이와 전 서비스의 인증 동작을 함께 결정한다.
+    #   none     : 검증하지 않고 통과시킨다 (기본). 인증·인가를 앞단 포털/SSO가 끝내는 정수장
+    #   internal : auth-service가 발급한 토큰을 검증한다
+    # 게이트웨이만 끄면 각 서비스의 security-starter가 여전히 401을 낸다(다중 방어) —
+    # 그래서 스위치를 서비스별이 아니라 한 곳에 둔다.
+    #
+    # 결정은 SWTP_AUTH_MODE 환경변수가 내린다 — 정수장별 차이는 배포 환경의 .env 한 줄이다.
+    # 지정하지 않으면 none(검증 안 함)이다. 기본을 여는 쪽에 둔 것은 배포 현실을 따른 것이며,
+    # 그 대가로 설정을 빠뜨린 실수가 401이 아니라 '조용히 열린 상태'로 나타난다 —
+    # 검증이 필요한 정수장은 .env에 SWTP_AUTH_MODE=internal을 반드시 적는다.
+    mode: ${SWTP_AUTH_MODE:none}
+
+# 콘솔 로그 포맷 — 정수장별로 로그 수집 파이프라인 운용 여부가 다르므로 스위치로 둔다.
+#   plain : 사람이 읽는 평문 (기본). 수집 파이프라인이 없는 정수장과 로컬 개발
+#   ecs   : ECS(Elastic Common Schema) JSON 1줄. 수집기가 stdout을 읽어 색인하는 정수장
+# 파일 로그(logs/<서비스>/)는 어느 쪽이든 평문이다 — 사람이 직접 열어 보는 감사·장애분석용 백업이다.
+#
+# 값이 아니라 '어느 logback 파일을 읽을지'를 고른다. logging.structured.format.console로는
+# 평문 전환이 불가능하기 때문이다 — Boot의 structured-console-appender.xml이 인코더를
+# 하드코딩하고 있어 그 프로퍼티를 비우면 평문이 되는 대신 기동이 깨진다.
+#
+# 결정은 SWTP_LOG_FORMAT 환경변수가 내린다 — swtp.auth.mode와 같은 패턴이다.
+# config-server 자신은 이 파일을 읽지 않지만(자기가 서빙하는 쪽이다) 같은 환경변수로 함께 전환된다.
+logging:
+  level: info
+  config: classpath:swtp-logback-${SWTP_LOG_FORMAT:plain}.xml
+  structured:
+    ecs:
+      service:
+        # 정수장 식별자 — ECS 표준 슬롯 service.node.name에 싣는다.
+        # 커스텀 필드를 신설하지 않는 이유: ECS가 이미 "노드 식별" 슬롯을 정의하고 있고
+        # Boot 4가 그 슬롯을 이 프로퍼티로 노출한다. 표준 필드에 실으면 Kibana/Beats의
+        # 기본 매핑과 대시보드가 그대로 먹는다.
+        #
+        # 값이 비어 있어도 기동에는 문제가 없다(필드가 빠질 뿐이다). 다만 중앙 집계로
+        # 전환하는 순간 "어느 정수장 로그인가"를 구분할 수 없고, 그때 채우면 이미 적재된
+        # 인덱스를 재색인해야 한다 — 인프라 배치는 되돌리기 쉽지만 데이터 스키마는 아니다.
+        # 그래서 정수장 배포 시 .env에 SWTP_SITE_CODE를 반드시 채운다.
+        #
+        # 값 형식: 대문자 영숫자 + 하이픈 (예: GANGNEUNG-01). 공백·한글 금지 —
+        # Kibana 필터와 인덱스 라우팅에 그대로 쓰이므로 안정적이어야 한다.
+        node-name: ${SWTP_SITE_CODE:}
+
+# 서비스 레지스트리 클라이언트 공통 규약 — 게이트웨이가 lb://로 대상을 찾을 수 있게 각 서비스가 자기를 등록한다.
+# register-with-eureka/fetch-registry는 여기서 건드리지 않는다: discovery-server 자신이
+# 그 둘을 false로 두고 있는데, config-server가 내려주는 값이 앱 로컬 설정을 이기므로
+# 여기에 쓰면 레지스트리 서버가 자기 자신에게 등록을 시도하게 된다.
+eureka:
+  client:
+    service-url:
+      # 로컬 단독 기동 기준값 — 컨테이너 환경은 application-docker.yml이 재정의한다
+      defaultZone: ${SWTP_DISCOVERY_URI:http://localhost:8761/eureka/}
+    # 기본값 30초는 "서비스는 떴는데 게이트웨이가 아직 모르는" 구간을 그만큼 만든다.
+    # 단일 서버 규모라 레지스트리 조회 부하가 무의미하므로 짧게 잡는다.
+    registry-fetch-interval-seconds: 5
+  instance:
+    # 갱신 10초 / 만료 30초 — 죽은 인스턴스가 레지스트리에 남아 503을 유발하는 시간을 줄인다
+    lease-renewal-interval-in-seconds: 10
+    lease-expiration-duration-in-seconds: 30
+
+spring:
+  kafka:
+    # 도메인 이벤트와 설정 전파(Config Bus)가 같은 브로커를 쓴다.
+    # bus.destination은 지정하지 않는다 — 기본 토픽명(springCloudBus)을 쓴다.
+    # config-server는 이 파일을 읽지 않아 자기 yml에 같은 값을 따로 두는데, 커스텀 이름을
+    # 두 곳에 적으면 갈라졌을 때 발행 토픽과 수신 토픽이 달라져 조용히 실패한다.
+    bootstrap-servers: localhost:9092 # 브로커 포트는 전 환경 9092 — 컨테이너 간은 kafka:9092 (docker 프로파일에서 재정의)
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - env
+          - busrefresh
+          - prometheus
+          - mappings
+  health:
+    # 설정 전파(Config Bus)의 binder 상태를 health 집계에서 뺀다.
+    # 빼지 않으면 Kafka 장애가 전 서비스 health를 DOWN으로 만들고, compose의
+    # depends_on: service_healthy 체인이 끊겨 스택 전체가 기동하지 못한다.
+    # bus는 optional 성격이다 — 설정을 갱신하지 못할 뿐, 서비스는 계속 동작해야 한다.
+    binders:
+      enabled: false

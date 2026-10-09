@@ -1,0 +1,33 @@
+// 모든 Java 모듈의 공통 규약: toolchain, 인코딩, 테스트 플랫폼
+
+plugins {
+    id 'java'
+}
+
+def libs = extensions.getByType(VersionCatalogsExtension).named('libs')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(libs.findVersion('java').get().requiredVersion.toInteger())
+    }
+}
+
+// Lombok — 전 모듈 기본 사용 (컴파일 시점 도구이므로 빌드 규약에 배치)
+dependencies {
+    compileOnly libs.findLibrary('lombok').get()
+    annotationProcessor libs.findLibrary('lombok').get()
+    testCompileOnly libs.findLibrary('lombok').get()
+    testAnnotationProcessor libs.findLibrary('lombok').get()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed', 'skipped'
+        exceptionFormat 'full'
+    }
+}

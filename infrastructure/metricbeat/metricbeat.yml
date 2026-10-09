@@ -1,0 +1,83 @@
+# Metricbeat — 컨테이너 상태와 앱 메트릭 수집기.
+# SFR-016 "도커 내부 프로세스가 정상 동작하는지 모니터링"의 실제 구현 지점이다.
+#
+# ⚠ 이미지가 실제로 읽는 경로는 /usr/share/metricbeat/metricbeat.yml 하나다 (step-16 함정 #1).
+
+metricbeat.modules:
+  # ── 컨테이너 상태 ──────────────────────────────────────────
+  # SFR-016의 "컨테이너 = 프로세스" 경계가 여기에 대응한다.
+  # healthcheck 메트릭셋은 compose의 depends_on 체인이 쓰는 그 healthcheck 결과를 읽는다 —
+  # 별도 계측 없이 기존 자산이 그대로 모니터링 신호가 된다.
+  - module: docker
+    metricsets:
+      - container   # 상태(running/exited/restarting)
+      - healthcheck # compose healthcheck 결과
+      - cpu
+      - memory
+      - network
+      - diskio
+      - info
+    hosts: ["unix:///var/run/docker.sock"]
+    period: 30s
+
+  # ── 앱 메트릭 (OpenMetrics) ────────────────────────────────
+  # /actuator/prometheus는 Prometheus 전용이 아니라 OpenMetrics 표준이다.
+  # 1사이클에서 micrometer-registry-prometheus를 남긴 이유가 이것이다(step-16 결정 2) —
+  # 앱 변경 0줄로 Metricbeat가 그대로 긁는다.
+  #
+  # 타깃 목록은 삭제된 prometheus-back.yml에서 이관했다(step-16 "메트릭 접점").
+  # Core 서비스만 둔다 — 항상 떠 있기 때문이다.
+  - module: prometheus
+    metricsets: ["collector"]
+    period: 30s
+    metrics_path: /actuator/prometheus
+    hosts:
+      - "http://config-server:8888"
+      - "http://discovery-server:8761"
+      - "http://gateway:8080"
+      - "http://master-service:8081"
+      - "http://telemetry-service:8082"
+      - "http://realtime-service:8083"
+      - "http://job-service:8084"
+      - "http://ems-service:8087"
+
+  # ── Optional 서비스 (compose profile로 선택 배포) ───────────
+  # 배포하는 정수장만 아래 블록의 주석을 푼다.
+  # 떠 있지 않은 대상을 목록에 두면 30초마다 접속 실패가 ERROR로 쌓인다 —
+  # 하루 2,880건이라 진짜 장애 로그가 묻힌다. 그래서 기본은 주석이다.
+  #
+  # - module: prometheus
+  #   metricsets: ["collector"]
+  #   period: 30s
+  #   metrics_path: /actuator/prometheus
+  #   hosts:
+  #     - "http://auth-service:8085"        # --profile auth
+  #     - "http://autonomous-service:8086"  # --profile autonomous
+  #     - "http://pms-service:8088"         # --profile pms
+  #
+  # ai-service(--profile ai)는 여기 없다. Gradle 모듈이 아니라 actuator가 없기 때문이다 —
+  # 상태는 위 docker 모듈의 container/healthcheck와 자기 ECS 로그로 본다.
+
+processors:
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  # 정수장 식별자 — 메트릭 문서는 앱이 만드는 게 아니라 Metricbeat가 만든다.
+  # 로그와 같은 필드에 실어야 Kibana에서 한 필터로 로그·메트릭을 함께 좁힐 수 있다.
+  - add_fields:
+      target: service.node
+      fields:
+        name: "${SWTP_SITE_CODE:unknown}"
+
+output.elasticsearch:
+  hosts: ["${SWTP_ELASTIC_HOSTS:http://elasticsearch:9200}"]
+
+# Kibana에 Metricbeat 기본 대시보드(Docker 컨테이너 현황 등)를 적재한다.
+# SFR-016 "ELK 기반 상태 정보 제공"의 1차 산출물이 이 대시보드다 —
+# 자체 화면을 만들지 않기로 한 경계(step-16 SFR-016 표)가 여기에 대응한다.
+setup.kibana:
+  host: "${SWTP_KIBANA_HOST:http://kibana:5601}"
+setup.dashboards.enabled: true
+
+# stderr로 내보낸다 — to_files: false만 두면 어디로도 나가지 않는다.
+logging.to_files: false
+logging.to_stderr: true

@@ -1,0 +1,40 @@
+# auth-service — 포트 고정표: 8085
+server:
+  port: 8085
+
+spring:
+  profiles:
+    active: dev, profile
+  application:
+    name: auth-service
+  config:
+    # config-server 연동 — optional: 미가동 시에도 단독 기동 가능. 컨테이너에서는 CONFIG_SERVER_URI로 재지정
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+
+  # 접속정보(url/username/password)는 config-server(config-repo/application.yml)가 SSOT다.
+  datasource:
+    hikari:
+      # setSchema()(=hikari.schema)는 경로를 통째로 대체해 ext(확장) 스키마가 사라지므로 쓰지 않는다.
+      connection-init-sql: SET search_path TO auth, public, ext
+  jpa:
+    properties:
+      hibernate.default_schema: auth
+  flyway:
+    # 스키마 소유권 규약: 자기 스키마만 관리, history 테이블도 자기 스키마 내부
+    schemas: auth
+    default-schema: auth
+
+swtp:
+  security:
+    # 스타터 기본값(actuator/API 문서)에 더해지는 auth-service 고유 예외 경로.
+    # permit-all-paths를 재정의하는 게 아니라 합집합이므로 actuator가 사라지지 않는다.
+    public-paths:
+      - /api/auth/login
+      - /api/auth/refresh
+      - /api/auth/logout          # 리프레시 토큰 소지 자체가 자격 — 만료된 액세스 토큰으로도 로그아웃 가능해야 한다
+      - /api/auth/.well-known/**  # JWKS는 공개키 배포 지점이라 인증을 걸면 안 된다
+  auth:
+    issuer: swtp-auth
+    access-token-validity: 30m
+    refresh-token-validity: 14d
+    ws-ticket-validity: 30s

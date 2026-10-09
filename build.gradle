@@ -1,0 +1,3 @@
+// 루트 프로젝트는 빌드 대상이 아니다.
+// 공통 빌드 규약은 build-logic/ Convention Plugin에서 관리하고,
+// 의존성 버전은 gradle/libs.versions.toml 버전 카탈로그에서 통제한다.

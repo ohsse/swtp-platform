@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  콘솔 ECS JSON — 로그 수집 파이프라인을 운용하는 정수장용.
+  배포 .env의 SWTP_LOG_FORMAT=ecs가 이 파일을 고른다 (기본은 swtp-logback-plain.xml).
+
+  왜 콘솔만 JSON인가:
+    · 수집기가 Docker 소켓으로 읽는 유일한 경로가 stdout이다.
+      JSON 한 줄이므로 Java 스택트레이스가 여러 엔트리로 쪼개지지 않는다(멀티라인 문제 원천 차단).
+    · ECS는 Elastic Common Schema다 — 수집기가 log.level / service.name / requestId를 그대로
+      필드로 색인한다. 포맷을 logstash·gelf로 바꾸면 그 필드 계약이 조용히 깨진다.
+    · FILE / ERROR_FILE은 여기서도 평문이다 — 사람이 읽는 백업이고 수집기는 읽지 않는다.
+-->
+<configuration>
+    <!-- CONSOLE_LOG_*/FILE_LOG_* 프로퍼티와 conversionRule 정의 (Boot 제공) -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!--
+      포맷을 여기서 못 박는다 — 이 파일이 선택된 시점에 이미 ECS를 의도한 것이기 때문이다.
+      defaults.xml이 CONSOLE_LOG_STRUCTURED_FORMAT을 (logging.structured.format.console 미설정 시)
+      빈 문자열로 정의하므로 반드시 그 include 뒤에 와야 덮어쓴다. 순서를 바꾸면 포맷이 비어
+      StructuredLogEncoder가 기동에 실패한다.
+      따라서 포맷 선택은 logging.structured.format.console이 아니라 logging.config가 담당한다.
+    -->
+    <property name="CONSOLE_LOG_STRUCTURED_FORMAT" value="ecs"/>
+
+    <!-- 구조화 콘솔 appender (Boot 제공 조각 재사용) — appender 이름은 평문 조각과 같은 CONSOLE이다 -->
+    <include resource="org/springframework/boot/logging/logback/structured-console-appender.xml"/>
+
+    <!-- 파일 appender와 root — 포맷과 무관한 공통부 -->
+    <include resource="swtp-logback-common.xml"/>
+</configuration>

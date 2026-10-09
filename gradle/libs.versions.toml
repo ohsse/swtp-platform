@@ -1,0 +1,27 @@
+# 스마트정수장 플랫폼 버전 카탈로그
+# Spring Boot / Spring Cloud 버전은 반드시 이 파일에서만 변경한다.
+# (Cloud 2025.1.x <-> Boot 4.1.x 조합 문제 발생 시 spring-boot를 4.0.x로 하향하는 것이 escape hatch)
+
+[versions]
+java = "21"
+spring-boot = "4.1.0"
+spring-cloud = "2025.1.2"
+lombok = "1.18.46"
+springdoc = "3.1.0"      # Boot 4 지원 세대 (Boot 3용 2.x와 구분)
+p6spy = "3.9.1"
+
+[libraries]
+# build-logic(Convention Plugin)에서 사용하는 플러그인 구현체
+spring-boot-gradle-plugin = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "spring-boot" }
+
+# BOM
+spring-cloud-dependencies = { module = "org.springframework.cloud:spring-cloud-dependencies", version.ref = "spring-cloud" }
+
+# 공통 도구
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+springdoc-openapi-starter-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+springdoc-openapi-starter-webflux-ui = { module = "org.springdoc:springdoc-openapi-starter-webflux-ui", version.ref = "springdoc" }
+p6spy = { module = "p6spy:p6spy", version.ref = "p6spy" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }

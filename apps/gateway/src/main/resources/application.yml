@@ -1,0 +1,156 @@
+# gateway — 포트 고정표: 8080
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway
+  config:
+    # config-server 연동 — 레지스트리 주소·인증 모드 같은 환경별 값을 받는다.
+    # 라우팅 URI는 더 이상 환경별로 갈리지 않는다(lb:// 참조) — 그래서 gateway-docker.yml이 없다.
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+  cloud:
+    loadbalancer:
+      cache:
+        # 기본 35초는 새로 뜬 인스턴스가 레지스트리에 보이는데도 게이트웨이는 계속 옛 목록으로
+        # 라우팅하는 구간을 만든다. Eureka 조회 주기(5초)와 맞춰 잡는다.
+        ttl: 5s
+    gateway:
+      server:
+        webflux:
+          # CORS 중앙화 — 각 서비스에서 CORS를 또 설정하면 헤더가 중복돼 브라우저가 거부한다.
+          # 서비스 측(security-starter)은 CORS를 끄고 여기 한 곳만 남긴다.
+          globalcors:
+            cors-configurations:
+              '[/**]':
+                # 개발 기본값은 전체 허용. 운영은 SWTP_CORS_ALLOWED_ORIGINS로 오리진을 고정한다.
+                # 쿠키가 아니라 Bearer 토큰을 쓰므로 allow-credentials는 false로 둘 수 있고,
+                # 그래서 와일드카드 오리진이 성립한다(credentials=true면 와일드카드가 금지된다).
+                allowed-origin-patterns: "${SWTP_CORS_ALLOWED_ORIGINS:*}"
+                allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+                allowed-headers: "*"
+                exposed-headers: [X-Request-Id]
+                allow-credentials: false
+                max-age: 3600
+          # 레지스트리 기반 라우팅 — uri의 lb://{서비스명}은 Eureka에 등록된 인스턴스로 해석된다.
+          # 호스트도 포트도 적지 않으므로 로컬·컨테이너·다중 노드에서 이 목록 하나가 그대로 쓰인다
+          # (예전에는 같은 목록을 config-repo/gateway-docker.yml에 복제해 인덱스 단위로 덮어썼다).
+          # 대상이 레지스트리에 없으면 503 — 라우트 정의는 살아 있고 인스턴스만 없는 상태로 구분된다.
+          # 경로 규약은 /{서비스명}/** + RewritePath 하나로 통일한다(step-18). 예외를 만들지 않는다 —
+          # 규약이 둘이면 문서 URL·화이트리스트도 둘로 갈라지고, 어느 쪽인지는 라우트를 봐야만 안다.
+          routes:
+            - id: master-service
+              uri: lb://master-service
+              predicates:
+                # /** 가 빠지면 정확히 "/master-service/" 한 경로만 매칭된다 — 하위 경로가 전부 404다
+                - Path=/master-service/**
+              filters:
+                - RewritePath=/master-service/(?<segment>.*), /$\{segment}
+            - id: telemetry-service
+              uri: lb://telemetry-service
+              predicates:
+                - Path=/telemetry-service/**
+              filters:
+                - RewritePath=/telemetry-service/(?<segment>.*), /$\{segment}
+            - id: realtime-service
+              uri: lb://realtime-service
+              predicates:
+                - Path=/realtime-service/**
+              filters:
+                - RewritePath=/realtime-service/(?<segment>.*), /$\{segment}
+            - id: job-service
+              uri: lb://job-service
+              predicates:
+                - Path=/job-service/**
+              filters:
+                - RewritePath=/job-service/(?<segment>.*), /$\{segment}
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                - Path=/auth-service/**
+              filters:
+                - RewritePath=/auth-service/(?<segment>.*), /$\{segment}
+            - id: autonomous-service
+              uri: lb://autonomous-service
+              predicates:
+                - Path=/autonomous-service/**
+              filters:
+                - RewritePath=/autonomous-service/(?<segment>.*), /$\{segment}
+            - id: ems-service
+              uri: lb://ems-service
+              predicates:
+                - Path=/ems-service/**
+              filters:
+                - RewritePath=/ems-service/(?<segment>.*), /$\{segment}
+            - id: pms-service
+              uri: lb://pms-service
+              predicates:
+                - Path=/pms-service/**
+              filters:
+                - RewritePath=/pms-service/(?<segment>.*), /$\{segment}
+
+# API 문서 집계 — http://localhost:8080/swagger-ui.html 드롭다운에서 서비스를 전환한다.
+# url은 전부 상대 경로라 로컬/컨테이너에서 동일하게 동작한다 (라우트 uri와 같은 이유로 환경 독립적이다).
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    # 서비스가 문서를 노출하는 경로는 /api/{prefix}/v3/api-docs 다 —
+    # web-starter의 SwtpOpenApiEnvironmentPostProcessor가 application.name에서 유도한다.
+    # 여기 url은 "게이트웨이에서 본 주소"다. 라우트가 전부 /{서비스명}/** + RewritePath로
+    # 통일돼 있으므로(step-18) 형태는 하나다 — /{서비스명} + 서비스 경로.
+    # 라우트를 추가하면 여기도 함께 추가한다 — ApiDocsRouteConsistencyTest가 잡는다.
+    urls:
+      - name: master-service
+        url: /master-service/api/master/v3/api-docs
+      - name: telemetry-service
+        url: /telemetry-service/api/telemetry/v3/api-docs
+      - name: realtime-service
+        url: /realtime-service/api/realtime/v3/api-docs
+      - name: job-service
+        url: /job-service/api/job/v3/api-docs
+      - name: auth-service
+        url: /auth-service/api/auth/v3/api-docs
+      - name: autonomous-service
+        url: /autonomous-service/api/autonomous/v3/api-docs
+      - name: ems-service
+        url: /ems-service/api/ems/v3/api-docs
+      - name: pms-service
+        url: /pms-service/api/pms/v3/api-docs
+    # 드롭다운 초기 선택값 — 미지정 시 알파벳순 첫 항목이라 의도와 어긋난다
+    urls-primary-name: master-service
+
+swtp:
+  auth:
+    # 인증 검증 모드 — none(기본, 검증 안 함) / internal(검증함).
+    # 정수장별 결정은 SWTP_AUTH_MODE 환경변수가 내리고, 게이트웨이와 전 서비스가
+    # 같은 값을 받는다. 여기 값은 환경변수도 config-server도 없을 때의 기본값이다 —
+    # config-repo/application.yml과 같은 값이어야 로컬 단독 기동과 컨테이너가 갈리지 않는다.
+    mode: ${SWTP_AUTH_MODE:none}
+    # 공개키(JWKS) 위치. 기본값은 로컬 단독 기동 기준이라 컨테이너에서는 SWTP_AUTH_JWKS_URI로
+    # 재정의해야 한다 — mode와 한 쌍이므로 반드시 함께 지정한다.
+    # (다른 서비스는 security-starter의 EnvironmentPostProcessor가 같은 기본값을 넣어준다 —
+    #  게이트웨이는 WebFlux라 그 스타터를 쓰지 않으므로 여기에 직접 둔다)
+    jwks-uri: ${SWTP_AUTH_JWKS_URI:http://localhost:8085/api/auth/.well-known/jwks.json}
+  gateway:
+    security:
+      # 인증 없이 통과할 경로. 로그인·재발급·JWKS는 토큰을 얻기 전에 호출해야 하므로 필연적으로 공개다.
+      permit-all-paths:
+        - /actuator/**
+        - /*-service/actuator/**
+        - /auth-service/api/auth/login
+        - /auth-service/api/auth/refresh
+        - /auth-service/api/auth/logout
+        - /auth-service/api/auth/.well-known/**
+        # API 문서 — 게이트웨이가 호스팅하는 집계 UI(/swagger-ui/**, /webjars/**, /v3/api-docs/**)와
+        # 라우팅으로 끌어오는 서비스별 스펙. UI가 뜨기 전에는 토큰을 얻을 화면 자체가 없으므로
+        # 문서 경로는 필연적으로 공개다.
+        - /swagger-ui.html
+        - /swagger-ui/**
+        - /webjars/**
+        - /v3/api-docs/**
+        # 서비스별 스펙 — 라우트가 /{서비스명}/**로 통일돼 접두사가 하나 더 붙는다(/{서비스명}/api/{prefix}/...).
+        # 빠뜨리면 드롭다운에서 그 서비스만 401로 비어 보인다.
+        - /*-service/api/*/v3/api-docs/**
+      # 쿼리 파라미터 티켓을 허용할 경로 — 실시간 스트림으로만 좁힌다
+      ticket-auth-paths:
+        - /realtime-service/**

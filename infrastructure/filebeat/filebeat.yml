@@ -1,0 +1,79 @@
+# Filebeat — 컨테이너 stdout 로그 수집기.
+# 철거된 Grafana Alloy(step-16)가 하던 네 가지를 그대로 이어받는다:
+#   1) docker.sock으로 컨테이너 발견  2) swtp- 접두사 필터  3) JSON 파싱  4) 수집 위치 영속화
+#
+# ⚠ 이미지가 실제로 읽는 경로는 /usr/share/filebeat/filebeat.yml 하나다.
+#   step-16 함정 #1 — Prometheus는 설정을 다른 경로에 마운트해 놓고 기동에 성공했고,
+#   그래서 앱 타깃이 등록된 적이 없다는 사실이 1년 가까이 드러나지 않았다.
+#   마운트 경로를 바꿀 일이 있으면 이미지 기본 경로와 같은지 반드시 확인한다.
+
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      # 컨테이너가 뜨고 지는 것을 감시한다 — 새 서비스를 추가해도 설정 변경이 필요 없다.
+      templates:
+        - condition:
+            regexp:
+              # 호스트에 떠 있는 무관한 컨테이너의 로그 유입을 막는다.
+              # Alloy의 discovery.relabel 필터와 같은 역할이다.
+              docker.container.name: '^swtp-'
+          config:
+            - type: filestream
+              id: swtp-${data.docker.container.id}
+              paths:
+                - /var/lib/docker/containers/${data.docker.container.id}/*.log
+              parsers:
+                # 1단계 — Docker json-file 드라이버의 껍데기를 벗긴다 (log/stream/time)
+                - container:
+                    stream: all
+                    format: docker
+                # 2단계 — 껍데기 안의 본문이 우리 앱의 ECS JSON이면 필드로 펼친다.
+                - ndjson:
+                    target: ""
+                    overwrite_keys: true
+                    expand_keys: true
+                    # kafka/timescaledb 컨테이너 로그는 평문이라 파싱이 실패한다.
+                    # 실패를 에러로 남기지 않고 message 그대로 통과시킨다 —
+                    # 이 둘도 장애 분석에는 필요하므로 필터에서 빼지 않는다.
+                    ignore_decoding_error: true
+                    add_error_key: false
+
+processors:
+  # 컨테이너 이름/이미지/라벨을 문서에 붙인다 — Kibana에서 서비스별로 거르는 축이 된다.
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  # 정수장 식별자. 앱 로그는 자기가 service.node.name을 싣지만(config-repo/application.yml),
+  # kafka/timescaledb처럼 우리 설정을 안 읽는 컨테이너는 여기서 채워야 값이 균일해진다.
+  #
+  # ⚠ when.not.has_fields가 없으면 안 된다. add_fields는 target을 평면 점표기 키
+  #   ("service.node")로 문서에 넣는데, Elasticsearch는 색인할 때 점을 경로로 펼친다.
+  #   앱이 이미 실은 중첩 service.node.name과 같은 필드로 합쳐지면서 **한 문서에 값이
+  #   두 개** 들어가고, Kibana에서 정수장 필터가 두 값 모두에 매칭된다.
+  #   실측(2026-08-21): 가드 없이 돌렸더니 gateway 문서 138건이 GANGNEUNG-01과
+  #   unknown 양쪽에 잡혔다. step-16 함정 #4(ECS JSON은 중첩 객체다)가 수집기 쪽에서
+  #   되풀이된 형태다.
+  - add_fields:
+      target: service.node
+      fields:
+        name: "${SWTP_SITE_CODE:unknown}"
+      # 앱이 스스로 실은 문서는 건드리지 않는다 — 우리 설정을 안 읽는 컨테이너만 채운다
+      when.not.has_fields: ["service.node.name"]
+
+# 수집 위치(registry)는 볼륨에 영속화한다 — 재시작 시 중복 적재/누락 방지.
+# Alloy가 alloy-data 볼륨으로 하던 일이다.
+filebeat.registry.path: /usr/share/filebeat/data/registry
+
+output.elasticsearch:
+  # 정수장 서버 동거가 기본, 중앙 집계 전환은 이 값 한 줄 교체다.
+  hosts: ["${SWTP_ELASTIC_HOSTS:http://elasticsearch:9200}"]
+
+# Kibana 쪽 준비물을 적재한다 — 이게 없으면 데이터 뷰(filebeat-*)가 만들어지지 않아
+# 운영자가 Discover에서 로그를 아예 열 수 없다. 색인은 되는데 보이지 않는 상태가 된다.
+setup.kibana:
+  host: "${SWTP_KIBANA_HOST:http://kibana:5601}"
+setup.dashboards.enabled: true
+
+# 자체 로그는 컨테이너 stderr로 — docker compose logs filebeat로 바로 본다.
+# to_files: false만 두면 어디로도 나가지 않아 수집기가 조용해진다(정상 동작과 구분이 안 된다).
+logging.to_files: false
+logging.to_stderr: true

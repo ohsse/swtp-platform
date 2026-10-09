@@ -1,0 +1,23 @@
+// 실시간 브로드캐스트 서비스 — telemetry.raw 소비 → SSE 전달 (Phase 7 최소 SSE 구현, WebSocket은 차후)
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation project(':starters:swtp-web-starter')
+    implementation project(':starters:swtp-kafka-starter')
+    implementation project(':starters:swtp-observability-starter')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시에도 기동 가능)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    // 서비스 레지스트리 등록 — 게이트웨이가 lb://로 이 서비스를 찾는다.
+    // 레지스트리가 없어도 재시도만 할 뿐 기동은 막지 않는다 (config-server와 같은 optional 성격)
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // 통합 테스트 — Kafka만 필요 (DB 미사용)
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // ContainerTestUtils.waitForAssignment — latest 오프셋 소비자의 발행 유실 경합 방지
+    testImplementation 'org.springframework.kafka:spring-kafka-test'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-kafka'
+}

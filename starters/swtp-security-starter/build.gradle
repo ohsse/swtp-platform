@@ -1,0 +1,24 @@
+// 인증/인가 공통 규약 스타터 — JWT "검증 전담" (발급은 auth-service 단독 책임)
+// 서블릿 전용이다. 게이트웨이(WebFlux)는 이 스타터를 쓰지 않고 자체 GlobalFilter로 검증한다.
+plugins {
+    id 'swtp.spring-library'
+    // 각 서비스 통합 테스트가 토큰을 직접 만들 수 있게 테스트 픽스처를 함께 배포한다
+    id 'java-test-fixtures'
+}
+
+dependencies {
+    // JWT 클레임 규약(SwtpJwtClaims) + 감사 주체 SPI(AuditorProvider)
+    api project(':libs:swtp-common')
+    // 검증만 한다 — 서명키를 들고 있지 않고 jwk-set-uri로 공개키를 받아 검증한다.
+    // 발급처 교체(외부 IdP)는 이 URI 한 줄 변경으로 끝난다 (아키텍처 4.1의 Optional 요건)
+    api 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+
+    // 웹 스택은 소비 앱이 소유한다 — 스타터가 강제 전파하면 비웹 앱까지 오염된다
+    compileOnly 'org.springframework.boot:spring-boot-starter-webmvc'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    // 픽스처는 RSA 키쌍 생성 + 토큰 서명이 필요하다 (NimbusJwtEncoder)
+    testFixturesApi 'org.springframework.security:spring-security-oauth2-jose'
+    testFixturesApi project(':libs:swtp-common')
+    testFixturesApi 'org.springframework.boot:spring-boot-test'
+}

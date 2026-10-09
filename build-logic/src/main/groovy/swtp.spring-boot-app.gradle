@@ -1,0 +1,70 @@
+// apps/ 독립 실행 Spring Boot 애플리케이션 규약
+// io.spring.dependency-management 대신 Gradle 네이티브 platform()을 사용한다
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
+
+plugins {
+    id 'swtp.java-common'
+    id 'org.springframework.boot'
+}
+
+dependencies {
+    implementation platform(SpringBootPlugin.BOM_COORDINATES)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // Gradle 9는 JUnit Platform launcher를 자동 주입하지 않으므로 명시 필요
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// 앱 모듈 산출물은 실행 가능한 bootJar 하나로 통일한다 (-plain.jar 미생성 → Dockerfile COPY 와일드카드 안전)
+tasks.named('jar') {
+    enabled = false
+}
+
+// 아키텍처 원칙 강제: 앱 모듈 간 직접 의존 금지 (허용 방향: apps → starters → libs)
+afterEvaluate {
+    ['compileClasspath', 'runtimeClasspath'].each { configurationName ->
+        def forbidden = configurations.getByName(configurationName).allDependencies
+                .withType(ProjectDependency)
+                .collect { it.path }
+                .findAll { it.startsWith(':apps:') }
+        if (!forbidden.isEmpty()) {
+            throw new GradleException(
+                    "앱 모듈 간 직접 의존은 금지된다: ${project.path} -> ${forbidden}. " +
+                    '공유가 필요하면 libs/ 또는 starters/ 모듈로 옮길 것.')
+        }
+    }
+}
+
+// 통합 테스트 표준형 강제 (apps/CLAUDE.md "통합 테스트 표준형")
+// DB나 Kafka를 쓰면서 실제 인프라를 띄우는 테스트가 없는 상태는 앱 동작에 아무 지장이 없다 —
+// 컴파일러도 런타임도 알려주지 않으므로 빌드가 알려준다.
+// 위 의존 검증과 달리 configuration 시점에 세우지 않는다: 스타터를 먼저 붙이고 테스트를 나중에 쓰는
+// 중간 상태에서도 compileJava·bootRun은 돌아야 하기 때문이다. check에서만 막는다.
+afterEvaluate {
+    def infraStarters = [':starters:swtp-persistence-starter', ':starters:swtp-kafka-starter']
+    def usedInfra = configurations.getByName('runtimeClasspath').allDependencies
+            .withType(ProjectDependency)
+            .collect { it.path }
+            .findAll { infraStarters.contains(it) }
+    // 설정 시점에 boolean으로 확정한다 — 태스크 실행 시점에 project를 참조하면 구성 캐시가 깨진다
+    def hasBaseline = !fileTree('src/test/java') { include '**/AbstractIntegrationTest.java' }.isEmpty()
+    def modulePath = project.path
+
+    def verifyBaseline = tasks.register('verifyIntegrationTestBaseline') {
+        group = 'verification'
+        description = 'DB·Kafka를 쓰는 앱이 통합 테스트 기준형을 갖는지 검증한다'
+        doLast {
+            if (!usedInfra.isEmpty() && !hasBaseline) {
+                throw new GradleException(
+                        "${modulePath}는 ${usedInfra}를 의존하므로 통합 테스트 기준형이 필요하다. " +
+                        'src/test/java/**/AbstractIntegrationTest.java를 만들 것 — ' +
+                        'apps/master-service의 것이 기준형이다(apps/CLAUDE.md). ' +
+                        'H2로 대체하지 않는다(루트 불변식 5).')
+            }
+        }
+    }
+    tasks.named('check') {
+        dependsOn verifyBaseline
+    }
+}

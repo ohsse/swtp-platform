@@ -1,0 +1,9 @@
+// 설정 중앙화 서버 — native(파일시스템) 백엔드로 루트 config-repo/ 디렉토리를 서빙
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-config-server'
+    implementation project(':starters:swtp-observability-starter')
+}

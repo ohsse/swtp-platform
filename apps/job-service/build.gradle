@@ -1,0 +1,38 @@
+// Job 서비스 — Quartz/Batch 통합 실행 웹 애플리케이션 (Phase 8 수직 슬라이스)
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation project(':starters:swtp-web-starter')
+    implementation project(':starters:swtp-kafka-starter')
+    implementation project(':starters:swtp-observability-starter')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // JDBC/Flyway/p6spy 공통 규약 — data-jpa를 의존하지 않으므로 JPA Auditing은 로드되지 않는다.
+    // 실행 이력은 insert + 상태 update뿐 — 영속성 컨텍스트가 무용하므로 JdbcClient를 쓴다 (Phase 8 결정)
+    implementation project(':starters:swtp-persistence-starter')
+    // JWT 검증(다중 방어) — 게이트웨이를 우회한 직접 호출도 차단한다
+    implementation project(':starters:swtp-security-starter')
+    // Quartz(실행 시점) + Batch(대량 처리) — 메타테이블은 각자 quartz/batch 스키마 소유
+    implementation 'org.springframework.boot:spring-boot-starter-quartz'
+    implementation 'org.springframework.boot:spring-boot-starter-batch'
+    // Boot 4.x에서 Batch의 JDBC JobRepository(spring.batch.jdbc.*)가 별도 모듈로 분리됨
+    implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시에도 기동 가능)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    // 서비스 레지스트리 등록 — 게이트웨이가 lb://로 이 서비스를 찾는다.
+    // 레지스트리가 없어도 재시도만 할 뿐 기동은 막지 않는다 (config-server와 같은 optional 성격)
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // 통합 테스트에서 auth-service 없이 토큰을 발급/검증하기 위한 픽스처
+    testImplementation testFixtures(project(':starters:swtp-security-starter'))
+    // 통합 테스트 — H2 대체 불가(계획서 리스크 5), 운영과 동일 이미지의 Testcontainers 표준화
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // Boot 4에서 TestRestTemplate이 별도 모듈로 분리됨 (starter-test 미포함) — RestTemplateBuilder도 별도 모듈
+    testImplementation 'org.springframework.boot:spring-boot-resttestclient'
+    testImplementation 'org.springframework.boot:spring-boot-restclient'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+    testImplementation 'org.testcontainers:testcontainers-kafka'
+}

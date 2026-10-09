@@ -1,0 +1,9 @@
+# 테스트 전용 프로파일 오버라이드.
+#
+# -Pprofile=dev 로 빌드하면 dev application.yaml(저장소 경로 D:/inp_simulator/files)이 베이스로 적용되는데,
+# 빌드/CI 머신에는 D: 드라이브가 없을 수 있어 StorageInitializer 가 디렉터리 생성에 실패한다.
+# 테스트에서는 항상 존재·쓰기 가능한 빌드 디렉터리로 저장소 경로를 덮어써 환경 의존성을 제거한다.
+# (build.gradle 의 test 태스크가 spring.profiles.active=test 로 이 파일을 활성화한다)
+editor:
+  storage:
+    base-path: build/test-storage

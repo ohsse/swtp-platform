@@ -1,0 +1,27 @@
+# 업무 마이크로서비스 전용 공통 설정.
+# config-server/gateway/discovery는 이 프로파일을 활성화하지 않는다.
+
+server:
+  # Eureka 등록을 전제로 업무 서비스 내부 포트는 충돌 방지를 위해 랜덤 포트를 사용한다.
+  port: 0
+
+swtp:
+  db:
+    # 접속정보 SSOT: DB명/계정/비밀번호/스키마명은 전 환경 동일, host/port만 환경변수로 재정의한다.
+    host: ${SWTP_DB_HOST:localhost}
+    port: ${SWTP_DB_PORT:15432}
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: none # DDL은 Flyway 단독 소유 — 엔티티/스키마 불일치는 기동 실패로 드러낸다
+    open-in-view: false
+  flyway:
+    # 스키마 생성 주체는 infrastructure/postgresql/init/01-schemas.sql 단독 — Flyway는 테이블 DDL만 담당한다.
+    # 스키마별 소유권과 history 테이블 위치는 서비스별 yml이 정한다.
+    create-schemas: false
+  datasource:
+    driver-class-name: com.p6spy.engine.spy.P6SpyDriver
+    url: jdbc:p6spy:postgresql://${swtp.db.host}:${swtp.db.port}/swtp
+    username: swtp_dba
+    password: swtp_local_dev # 공개본 로컬 데모 전용 값 — infrastructure/postgresql/init/00-bootstrap.sql 과 같은 값이어야 한다

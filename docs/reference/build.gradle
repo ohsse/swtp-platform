@@ -1,0 +1,121 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.mindone'
+version = '0.0.1-SNAPSHOT'
+description = 'editor'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    // 외부 라이브러리 버전 (Spring Boot 4.1.0 BOM 비관리 항목만 명시)
+    jtsVersion = '1.20.0'                    // JTS 공간 기하 라이브러리
+    jgraphtVersion = '1.5.3'                 // 그래프(위상) 분석
+    juniversalchardetVersion = '2.5.0'       // 문자 인코딩 자동판별
+    mapstructVersion = '1.6.3'               // 객체 매핑(1.7.x는 Beta라 안정판 사용)
+    lombokMapstructBindingVersion = '0.2.0'  // Lombok-MapStruct 연동
+    springdocVersion = '3.0.3'               // OpenAPI 문서(Spring Boot 4.x 호환)
+}
+
+dependencies {
+    // ===== Web / REST API =====
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    // ===== 영속화: 프로젝트/버전 메타데이터, 섹션 행(sectionRows) 저장 =====
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+    // 스키마 버전 관리(운영 단계). 버전은 Spring Boot BOM이 관리
+    // Spring Boot 4.x는 자동설정이 기술별 모듈로 분리되어, Flyway 자동설정 모듈을 별도로 추가해야 한다.
+    implementation 'org.springframework.boot:spring-boot-flyway'
+    implementation 'org.flywaydb:flyway-core'
+    runtimeOnly 'org.flywaydb:flyway-mysql'              // MariaDB(MySQL 계열) 지원 모듈
+
+    // ===== 검증: Parser 단계 DTO/스키마 검증(Validation Annotati-on) =====
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // ===== 공간 데이터 / GeoJSON: Combiner의 NetworkModel→GeoJSON, Geometry 검증 =====
+    implementation "org.locationtech.jts:jts-core:${jtsVersion}"
+    implementation "org.locationtech.jts.io:jts-io-common:${jtsVersion}"
+
+    // ===== 그래프 모델: Topology 검증(연결성/고립 구간/공급원 연결) =====
+    implementation "org.jgrapht:jgrapht-core:${jgraphtVersion}"
+
+    // ===== 인코딩 자동판별: File Intake(UTF-8/CP949, BOM 처리) =====
+    implementation "com.github.albfernandez:juniversalchardet:${juniversalchardetVersion}"
+
+    // ===== 객체 매핑: Composer의 Model-to-Section Mapper, DTO↔도메인 변환 =====
+    implementation "org.mapstruct:mapstruct:${mapstructVersion}"
+
+    // ===== API 문서: Swagger UI(Vue 프론트팀과 API 계약 공유) =====
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+
+    // ===== 개발 편의 =====
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // ===== Lombok =====
+    compileOnly 'org.projectlombok:lombok'
+
+    // ===== 어노테이션 프로세서 (Lombok → binding → MapStruct 순서 유지 필요) =====
+    annotationProcessor 'org.projectlombok:lombok'
+    annotationProcessor "org.projectlombok:lombok-mapstruct-binding:${lombokMapstructBindingVersion}"
+    annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+
+    // ===== 테스트 =====
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+// 한글 주석/문자열 리터럴 보존을 위해 컴파일 인코딩을 UTF-8 로 고정한다.
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    // 테스트는 dev/운영 서버의 절대경로(D:/inp_simulator)에 의존하지 않도록 'test' 프로파일을 활성화한다.
+    // → src/test/resources/application-test.yaml 의 저장소 경로 오버라이드가 적용된다.
+    //   (로그 경로는 src/test/resources/logback-test.xml 에서 콘솔 전용으로 별도 처리)
+    systemProperty 'spring.profiles.active', 'test'
+}
+
+/**
+ * 지자체별 환경 프로파일 빌드 설정.
+ * 사용법: ./gradlew.bat :api:bootJar -Pprofile={지자체코드}
+ * 미지정 시 기본값 'common' → resources-env/common/ 없으므로 resources/ 기본 파일만 사용
+ */
+ext.profile = (!project.hasProperty('profile') || !profile) ? 'common' : profile
+
+sourceSets {
+    main {
+        resources {
+            srcDirs "src/main/resources-env/${profile}"
+        }
+    }
+}
+
+bootJar {
+    archiveFileName = 'api.jar'
+}
+
+jar {
+    enabled = false
+}
+
+// INCLUDE: resources-env/${profile}의 파일이 resources/ 기본 파일을 오버라이드하도록 허용.
+// Gradle은 나중에 추가된 srcDir(resources-env)의 파일을 우선 적용한다.
+tasks.named("processResources") {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}

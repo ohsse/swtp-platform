@@ -1,0 +1,15 @@
+// build-logic은 pluginManagement.includeBuild 로 루트 빌드에 포함되는 독립 빌드다.
+dependencyResolutionManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+    versionCatalogs {
+        libs {
+            // 루트 버전 카탈로그를 공유해 버전 통제점을 한 곳으로 유지한다
+            from(files('../gradle/libs.versions.toml'))
+        }
+    }
+}
+
+rootProject.name = 'build-logic'

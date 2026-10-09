@@ -1,0 +1,33 @@
+// EMS(에너지관리) 서비스 — Core 배포 대상 (전 정수장 필수, compose profile 없이 항상 기동)
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation project(':starters:swtp-web-starter')
+    implementation project(':starters:swtp-observability-starter')
+    // JDBC/Flyway/p6spy/JPA Auditing 공통 규약 (스키마별 소유권 원칙 — Flyway 10+ PG 지원 모듈 포함)
+    implementation project(':starters:swtp-persistence-starter')
+    // JWT 검증(다중 방어) + 감사 주체 SPI. 이게 없으면 rgstr_id/mdf_id가 전 행 'SYSTEM'이 된다
+    implementation project(':starters:swtp-security-starter')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    // persistence-starter는 JPA를 전파하지 않는다(compileOnly) — 쓰는 앱이 직접 선언한다
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시에도 기동 가능)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    // 서비스 레지스트리 등록 — 게이트웨이가 lb://로 이 서비스를 찾는다.
+    // 레지스트리가 없어도 재시도만 할 뿐 기동은 막지 않는다 (config-server와 같은 optional 성격)
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // 통합 테스트에서 auth-service 없이 토큰을 발급/검증하기 위한 픽스처
+    testImplementation testFixtures(project(':starters:swtp-security-starter'))
+    // 통합 테스트 — H2 대체 불가(루트 불변식 5), 운영과 동일 이미지의 Testcontainers 표준화.
+    // Kafka는 띄우지 않는다 — swtp-kafka-starter를 의존하지 않으므로 띄울 인프라가 없다(apps/CLAUDE.md)
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    // Boot 4에서 TestRestTemplate은 별도 모듈이고 @AutoConfigureTestRestTemplate opt-in이 필요하다.
+    // restclient는 그 백엔드(RestTemplateBuilder)라 함께 있어야 한다 — auth-service와 같은 조합
+    testImplementation 'org.springframework.boot:spring-boot-resttestclient'
+    testImplementation 'org.springframework.boot:spring-boot-restclient'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+}

@@ -1,0 +1,20 @@
+# master-service — 포트 고정표: 8081
+server:
+  port: 8081
+
+spring:
+  profiles:
+    active: dev, micro
+  application:
+    name: master-service
+  config:
+    # config-server 연동 — optional: 미가동 시에도 단독 기동 가능. 컨테이너에서는 CONFIG_SERVER_URI로 재지정
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+  jpa:
+    properties:
+      hibernate.default_schema: master
+  flyway:
+    # 스키마 소유권 규약의 두 번째 확장 사례(job-service의 3스키마 소유에 이어) —
+    # operation은 제어 이력 공용 write 스키마이나 DDL 소유는 master-service (문서 11.3 명시적 예외)
+    schemas: master,operation
+    default-schema: master

@@ -1,0 +1,26 @@
+# telemetry-service — 포트 고정표: 8082
+server:
+  port: 8082
+
+spring:
+  profiles:
+    active: dev, micro
+  application:
+    name: telemetry-service
+  config:
+    # config-server 연동 — optional: 미가동 시에도 단독 기동 가능. 컨테이너에서는 CONFIG_SERVER_URI로 재지정
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+
+  # 접속정보(url/username/password)는 config-server(config-repo/application.yml)가 SSOT다 —
+  # optional import라도 정상 배선에서는 항상 원격 값이 우선하므로 여기서는 두지 않는다.
+  datasource:
+    hikari:
+      # JdbcClient SQL에 스키마명을 하드코딩하지 않는다 — 커넥션 초기화 시 search_path로 결정.
+      # setSchema()(=hikari.schema)는 경로를 통째로 대체해 ext(확장) 스키마가 사라지므로 쓰지 않는다.
+      connection-init-sql: SET search_path TO telemetry, public, ext
+  flyway:
+    # 스키마 소유권 규약: 자기 스키마만 관리, history 테이블도 자기 스키마 내부
+    schemas: telemetry
+    default-schema: telemetry
+  kafka:
+    bootstrap-servers: localhost:9092 # 브로커 포트는 전 환경 9092 — 컨테이너 간은 kafka:9092 (docker 프로파일에서 재정의)

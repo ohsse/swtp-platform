@@ -1,0 +1,31 @@
+// 인증/인가 서비스 — Optional 배포 대상 (compose profile, Phase 5)
+// 플랫폼에서 유일하게 "토큰을 발급"하는 서비스다. 검증은 각 서비스의 security-starter와 게이트웨이가 한다.
+plugins {
+    id 'swtp.spring-cloud-app'
+}
+
+dependencies {
+    implementation project(':starters:swtp-web-starter')
+    implementation project(':starters:swtp-observability-starter')
+    // 자기 발급 토큰도 자기가 검증한다 (/api/auth/me 등) — 검증 규약은 다른 서비스와 완전히 동일하다
+    implementation project(':starters:swtp-security-starter')
+    // 사용자/역할/리프레시토큰/서명키를 auth 스키마에 보관 (원칙 15·16: Redis 미사용, 공유 상태는 PostgreSQL)
+    implementation project(':starters:swtp-persistence-starter')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // 토큰 서명(NimbusJwtEncoder) — 검증만 하는 다른 서비스에는 없는 auth-service 고유 의존
+    implementation 'org.springframework.security:spring-security-oauth2-jose'
+    // config-server에서 공통/환경별 설정을 받는다 (optional — 미가동 시에도 기동 가능)
+    implementation 'org.springframework.cloud:spring-cloud-starter-config'
+    // 서비스 레지스트리 등록 — 게이트웨이가 lb://로 이 서비스를 찾는다.
+    // 레지스트리가 없어도 재시도만 할 뿐 기동은 막지 않는다 (config-server와 같은 optional 성격)
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // 통합 테스트 — H2 대체 불가(계획서 리스크 5), 운영과 동일 이미지의 Testcontainers 표준화
+    testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+    testImplementation 'org.springframework.boot:spring-boot-resttestclient'
+    testImplementation 'org.springframework.boot:spring-boot-restclient'
+    testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+    testImplementation 'org.testcontainers:testcontainers-postgresql'
+}

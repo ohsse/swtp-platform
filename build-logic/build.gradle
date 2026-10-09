@@ -1,0 +1,10 @@
+plugins {
+    // src/main/groovy/*.gradle 파일을 precompiled script plugin으로 컴파일한다
+    id 'groovy-gradle-plugin'
+}
+
+dependencies {
+    // convention plugin 안에서 org.springframework.boot 플러그인과
+    // SpringBootPlugin.BOM_COORDINATES 를 사용하기 위한 구현체
+    implementation libs.spring.boot.gradle.plugin
+}

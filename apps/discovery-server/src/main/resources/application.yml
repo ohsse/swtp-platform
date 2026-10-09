@@ -1,0 +1,25 @@
+# discovery-server — 포트 고정표: 8761
+server:
+  port: 8761
+
+spring:
+  application:
+    name: discovery-server
+  config:
+    # config-server 연동 — optional: 미가동 시에도 단독 기동 가능. 컨테이너에서는 CONFIG_SERVER_URI로 재지정
+    import: "optional:configserver:${CONFIG_SERVER_URI:http://localhost:8888}"
+
+eureka:
+  client:
+    # 서버 자신은 레지스트리에 등록/조회하지 않는다 (단일 노드)
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    # 자기보호 모드 해제 — 하트비트가 임계치 아래로 떨어져도 등록 정보를 붙잡아 두는 기능이다.
+    # 여러 노드가 네트워크 분단된 상황을 살리려는 장치인데, 단일 서버 배포(문서 18장)에서는
+    # 컨테이너를 내려도 레지스트리에 유령 인스턴스가 남아 게이트웨이가 죽은 대상으로 라우팅한다.
+    enable-self-preservation: false
+    # 등록 변화가 응답 캐시에 반영되는 주기. 기본 30초는 클라이언트 조회 주기(5초)를 무의미하게 만든다
+    response-cache-update-interval-ms: 5000
+    # 만료된 리스를 걷어내는 주기 (기본 60초)
+    eviction-interval-timer-in-ms: 10000
